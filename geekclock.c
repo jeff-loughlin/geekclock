@@ -26,6 +26,8 @@ struct
 }
 text_box;
 
+enum {HEX, BINARY} mode = HEX;
+
 /* Connect to the display, set up the basic variables. */
 static void x_connect()
 {
@@ -55,8 +57,10 @@ static void create_window()
                              0, /* border width */
                              text_box.black_pixel, /* border pixel */
                              text_box.white_pixel  /* background */);
+
+    XGrabPointer(text_box.display, text_box.window, False, ButtonPressMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
     XSelectInput (text_box.display, text_box.window,
-                  ExposureMask);
+                  ExposureMask | ButtonPressMask | ButtonReleaseMask);
     XMapWindow (text_box.display, text_box.window);
 }
 
@@ -83,6 +87,60 @@ static void set_up_font ()
     XSetFont (text_box.display, text_box.gc, text_box.font->fid);
 }
 
+
+
+void strreverse(char* begin, char* end)
+{
+     char aux;
+     while(end>begin)
+        aux=*end, *end--=*begin, *begin++=aux;
+}
+
+void itoa(int value, char* str, int base) 
+{
+    static char num[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    char* wstr=str;
+    int sign;
+    div_t res;
+
+    if (base<2 || base>35)
+    {
+       *wstr='\0'; return; 
+    }
+
+    if ((sign=value) < 0)
+	value = -value;
+    do
+    {
+        res = div(value,base);
+        *wstr++ = num[res.rem];
+    }
+    while(value=res.quot);
+    if (sign<0) 
+        *wstr++='-';
+
+    *wstr='\0';
+    strreverse(str,wstr-1);
+}
+
+
+
+
+char *toBinary(const int n)
+{
+    static char binary[33];
+    char tmp[33];
+    itoa(n, tmp, 2);
+
+    int i;
+    for (i = 0; i < 8 - strlen(tmp); i++)
+	binary[i] = '0';
+    binary[i] = '\0';
+
+    strcat (binary, tmp);
+    return binary;
+}
+
 /* Draw the window. */
 static void draw_screen ()
 {
@@ -95,11 +153,21 @@ static void draw_screen ()
 
     time_t t = time(0);   // get time now
     struct tm * now = localtime(&t);
-    sprintf(text_box.text, "%02x:%02x:%02x", now->tm_hour, now->tm_min, now->tm_sec);
+    if (mode == HEX)
+	sprintf(text_box.text, "%02x:%02x:%02x", now->tm_hour, now->tm_min, now->tm_sec);
+    else
+    {
+	char hours[33], min[33], sec[33];
+	strcpy(hours, toBinary(now->tm_hour));
+	strcpy(min, toBinary(now->tm_min));
+	strcpy(sec, toBinary(now->tm_sec));
+	sprintf(text_box.text, "%s:%s:%s", hours, min, sec);
+    }
+	
     text_box.text_len = strlen (text_box.text);
 
 
-    /* Centre the text in the middle of the box. */
+    /* Center the text in the middle of the box. */
     XTextExtents (text_box.font, text_box.text, text_box.text_len,
                   & direction, & ascent, & descent, & overall);
     x = (text_box.width - overall.width) / 2;
@@ -142,6 +210,18 @@ static void event_loop()
 	    {
                 draw_screen();
             }
+	    else if (e.type == ButtonRelease)
+	    {
+		mode = (mode == HEX ? BINARY : HEX);
+
+		if (mode == HEX)
+		    text_box.width = 100;
+		else
+		    text_box.width = 300;
+
+		draw_screen();
+		printf("Received button release\n");
+	    }
 	}
     }
 }
