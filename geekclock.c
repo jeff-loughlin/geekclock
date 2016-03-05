@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <time.h>
 #include <pthread.h>
 
@@ -62,6 +63,11 @@ static void create_window()
     XSelectInput (text_box.display, text_box.window,
                   ExposureMask | ButtonPressMask | ButtonReleaseMask);
     XMapWindow (text_box.display, text_box.window);
+
+    XTextProperty titleProperty;
+    char *title = "Geek Clock";
+    XStringListToTextProperty(&title, 1, &titleProperty);
+    XSetWMName(text_box.display, text_box.window, &titleProperty);
 }
 
 /* Set up the GC (Graphics Context). */
@@ -219,8 +225,8 @@ static void event_loop()
 		else
 		    text_box.width = 300;
 
+		XResizeWindow(text_box.display, text_box.window, text_box.width, text_box.height);
 		draw_screen();
-		printf("Received button release\n");
 	    }
 	}
     }
